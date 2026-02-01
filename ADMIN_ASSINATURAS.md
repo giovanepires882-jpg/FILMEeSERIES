@@ -11,7 +11,7 @@ Se um cliente pagar via PIX mas a assinatura não for ativada automaticamente, u
 1. **Acesse o Admin**
    - Login: giovanepires17@hotmail.com
    - Senha: admin123
-   - URL: https://vodstream.preview.emergentagent.com/admin
+   - URL: https://streamflix-3916.preview.emergentagent.com/admin
 
 2. **Vá para a Aba "Usuários"**
    - Clique em "Usuários" no topo
@@ -72,7 +72,7 @@ curl http://localhost:3000/api/admin/users \
 
 ### Solução Permanente:
 1. Verifique se o webhook está configurado no painel do Mercado Pago
-2. URL: `https://vodstream.preview.emergentagent.com/api/webhooks/mercadopago`
+2. URL: `https://streamflix-3916.preview.emergentagent.com/api/webhooks/mercadopago`
 3. Evento: Apenas "Pagamentos"
 4. Chave secreta: Configure a MP_WEBHOOK_SECRET
 

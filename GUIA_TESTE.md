@@ -11,7 +11,7 @@
 ## 🎯 Como Assistir os VODs
 
 ### 1. Fazer Login
-- Acesse: https://vodstream.preview.emergentagent.com/login
+- Acesse: https://streamflix-3916.preview.emergentagent.com/login
 - Email: `z8gamesbu@hotmail.com`
 - Senha: A que você cadastrou
 

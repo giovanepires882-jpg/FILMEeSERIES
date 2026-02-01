@@ -34,8 +34,8 @@ Configure as seguintes variáveis no arquivo `.env`:
 DATABASE_URL=file:./dev.db
 
 # App
-APP_BASE_URL=https://vodstream.preview.emergentagent.com
-NEXT_PUBLIC_APP_URL=https://vodstream.preview.emergentagent.com
+APP_BASE_URL=https://streamflix-3916.preview.emergentagent.com
+NEXT_PUBLIC_APP_URL=https://streamflix-3916.preview.emergentagent.com
 
 # JWT
 JWT_SECRET=super-secret-jwt-key-change-in-production-32chars-min
@@ -94,7 +94,7 @@ O app estará rodando em `http://localhost:3000`
 
 ### URL do Webhook
 ```
-https://vodstream.preview.emergentagent.com/api/webhooks/mercadopago
+https://streamflix-3916.preview.emergentagent.com/api/webhooks/mercadopago
 ```
 
 ### Configurar no Painel do Mercado Pago
@@ -153,7 +153,7 @@ Eventos com `type: "test"` ou `action: "test.*"` são registrados mas **não ati
 
 Se o ambiente suportar cron, configure um job para chamar:
 ```bash
-curl -X POST https://vodstream.preview.emergentagent.com/api/admin/playlist/sync \
+curl -X POST https://streamflix-3916.preview.emergentagent.com/api/admin/playlist/sync \
   -H "Cookie: accessToken=<seu_token_admin>"
 ```
 
