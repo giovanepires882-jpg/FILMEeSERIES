@@ -37,7 +37,10 @@ export default function LoginPage() {
 
       if (res.ok) {
         toast.success(isLogin ? 'Login realizado!' : 'Conta criada com sucesso!')
-        router.push('/')
+        // Aguardar um pouco e forçar navegação
+        setTimeout(() => {
+          window.location.href = '/'
+        }, 500)
       } else {
         toast.error(data.error || 'Erro ao processar')
       }
