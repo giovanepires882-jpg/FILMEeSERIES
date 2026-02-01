@@ -650,14 +650,16 @@ async function handleMercadoPagoWebhook(req) {
     const xSignature = req.headers.get('x-signature')
     const xRequestId = req.headers.get('x-request-id')
     
-    console.log('Webhook received:', { body, xSignature, xRequestId })
+    console.log('🔔 Webhook received:', JSON.stringify({ body, xSignature, xRequestId }, null, 2))
     
     // Extrair resourceId
     const resourceId = body.data?.id || body.id
     if (!resourceId) {
-      console.error('No resourceId in webhook')
+      console.error('❌ No resourceId in webhook')
       return NextResponse.json({ error: 'No resourceId' }, { status: 400 })
     }
+    
+    console.log('📋 Processing payment ID:', resourceId)
     
     // Validar assinatura
     if (xSignature && xRequestId) {
@@ -669,25 +671,28 @@ async function handleMercadoPagoWebhook(req) {
       })
       
       if (!isValid) {
-        console.error('Invalid signature')
+        console.error('❌ Invalid signature')
         return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
       }
+      console.log('✅ Signature validated')
+    } else {
+      console.warn('⚠️ No signature headers, skipping validation')
     }
     
     // Idempotência
     const action = body.action || 'payment.updated'
-    const eventKey = `${xRequestId}:${action}:${resourceId}`
+    const eventKey = `${xRequestId || 'no-req-id'}:${action}:${resourceId}`
     
     const existingEvent = await prisma.webhookEvent.findUnique({
       where: { eventKey },
     })
     
     if (existingEvent) {
-      console.log('Event already processed:', eventKey)
+      console.log('ℹ️ Event already processed:', eventKey)
       return NextResponse.json({ success: true, message: 'Already processed' })
     }
     
-    // Salvar evento
+    // Salvar evento (JSON como string)
     await prisma.webhookEvent.create({
       data: {
         provider: 'mercadopago',
@@ -695,20 +700,27 @@ async function handleMercadoPagoWebhook(req) {
         resourceId: resourceId.toString(),
         action,
         eventKey,
-        rawJson: body,
+        rawJson: JSON.stringify(body),
         receivedAt: new Date(),
       },
     })
+    console.log('💾 Event saved')
     
     // Se for evento de teste, retornar sem processar
     if (body.type === 'test' || action.startsWith('test.')) {
-      console.log('Test event, skipping processing')
+      console.log('🧪 Test event, skipping processing')
       return NextResponse.json({ success: true, message: 'Test event received' })
     }
     
     // Consultar pagamento no MP
+    console.log('🔍 Fetching payment details from MP...')
     const mpPayment = await mp.getPaymentDetails(resourceId)
-    console.log('MP Payment details:', mpPayment)
+    console.log('📦 MP Payment:', JSON.stringify({
+      id: mpPayment.id,
+      status: mpPayment.status,
+      metadata: mpPayment.metadata,
+      external_reference: mpPayment.external_reference
+    }, null, 2))
     
     // Encontrar pagamento interno
     const payment = await prisma.payment.findUnique({
@@ -716,12 +728,20 @@ async function handleMercadoPagoWebhook(req) {
     })
     
     if (!payment) {
-      console.error('Payment not found in DB:', resourceId)
+      console.error('❌ Payment not found in DB:', resourceId)
       return NextResponse.json({ success: true, message: 'Payment not found locally' })
     }
     
+    console.log('💳 Local payment found:', {
+      id: payment.id,
+      userId: payment.userId,
+      currentStatus: payment.status,
+      planDays: payment.planDays
+    })
+    
     // Atualizar status
     const newStatus = mpPayment.status.toUpperCase()
+    console.log(`🔄 Updating payment status: ${payment.status} → ${newStatus}`)
     
     await prisma.payment.update({
       where: { mpPaymentId: resourceId.toString() },
@@ -733,14 +753,25 @@ async function handleMercadoPagoWebhook(req) {
     
     // Se aprovado, ativar assinatura
     if (newStatus === 'APPROVED') {
-      await subscription.activateSubscription(payment.userId, payment.planDays)
-      console.log('Subscription activated for user:', payment.userId)
+      console.log('✅ Payment APPROVED! Activating subscription...')
+      try {
+        const activatedSub = await subscription.activateSubscription(payment.userId, payment.planDays)
+        console.log('🎉 Subscription activated!', {
+          userId: payment.userId,
+          status: activatedSub.status,
+          endAt: activatedSub.endAt
+        })
+      } catch (error) {
+        console.error('❌ Error activating subscription:', error)
+        throw error
+      }
     }
     
     // Se refund/chargeback, suspender
     if (['REFUNDED', 'CHARGEBACK', 'CANCELLED'].includes(newStatus)) {
+      console.log('⚠️ Payment refunded/cancelled, suspending subscription')
       await subscription.suspendSubscription(payment.userId)
-      console.log('Subscription suspended for user:', payment.userId)
+      console.log('🚫 Subscription suspended for user:', payment.userId)
     }
     
     // Marcar evento como processado
@@ -749,9 +780,10 @@ async function handleMercadoPagoWebhook(req) {
       data: { processedAt: new Date() },
     })
     
+    console.log('✅ Webhook processed successfully!')
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Webhook processing error:', error)
+    console.error('❌ Webhook processing error:', error)
     return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 })
   }
 }
