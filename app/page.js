@@ -47,7 +47,8 @@ export default function HomePage() {
 
       if (categoriesRes.ok) {
         const data = await categoriesRes.json()
-        setCategories(data.categories)
+        // Limitar a 15 categorias para melhorar velocidade
+        setCategories(data.categories.slice(0, 15))
       }
 
       if (vodsRes.ok) {
