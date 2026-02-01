@@ -1304,6 +1304,8 @@ export async function POST(req, { params }) {
   if (path === 'admin/playlist/sync-url') return handleAdminSyncWithUrl(req)
   if (path === 'admin/vod/toggle') return handleAdminToggleVod(req)
   if (path === 'admin/vods/delete') return handleAdminDeleteVods(req)
+  if (path === 'admin/subscription/activate') return handleAdminActivateSubscription(req)
+  if (path === 'admin/subscriptions/fix') return handleAdminFixSubscriptions(req)
   
   return NextResponse.json({ error: 'Not found' }, { status: 404 })
 }
