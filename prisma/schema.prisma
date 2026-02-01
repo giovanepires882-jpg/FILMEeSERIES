@@ -80,7 +80,7 @@ model Payment {
   userId        String
   provider      String        @default("mercadopago")
   mpPaymentId   String        @unique
-  amount        Decimal       @db.Decimal(10, 2)
+  amount        Float
   planDays      Int
   status        PaymentStatus @default(PENDING)
   qrCodeBase64  String?       @db.Text
