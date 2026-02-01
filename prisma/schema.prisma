@@ -1,0 +1,192 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  INACTIVE
+  EXPIRED
+  SUSPENDED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  REFUNDED
+  CHARGEBACK
+}
+
+enum SyncStatus {
+  SUCCESS
+  FAIL
+}
+
+model User {
+  id              String         @id @default(uuid())
+  name            String?
+  email           String         @unique
+  passwordHash    String
+  role            Role           @default(USER)
+  termsAcceptedAt DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  
+  sessions        Session[]
+  subscription    Subscription?
+  payments        Payment[]
+  watchProgress   WatchProgress[]
+  favorites       Favorite[]
+}
+
+model Session {
+  id               String    @id @default(uuid())
+  userId           String
+  refreshTokenHash String
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+}
+
+model Subscription {
+  id        String             @id @default(uuid())
+  userId    String             @unique
+  status    SubscriptionStatus @default(INACTIVE)
+  startAt   DateTime?
+  endAt     DateTime?
+  updatedAt DateTime           @updatedAt
+  
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  userId        String
+  provider      String        @default("mercadopago")
+  mpPaymentId   String        @unique
+  amount        Decimal       @db.Decimal(10, 2)
+  planDays      Int
+  status        PaymentStatus @default(PENDING)
+  qrCodeBase64  String?       @db.Text
+  qrCodeText    String?       @db.Text
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  paidAt        DateTime?
+  
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([mpPaymentId])
+  @@index([status])
+}
+
+model WebhookEvent {
+  id          String   @id @default(uuid())
+  provider    String   @default("mercadopago")
+  requestId   String
+  resourceId  String
+  action      String
+  eventKey    String   @unique
+  receivedAt  DateTime @default(now())
+  rawJson     Json
+  processedAt DateTime?
+  
+  @@index([resourceId])
+  @@index([eventKey])
+}
+
+model PlaylistSource {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SyncLog {
+  id                 String     @id @default(uuid())
+  startedAt          DateTime   @default(now())
+  finishedAt         DateTime?
+  itemsUpserted      Int        @default(0)
+  itemsInactivated   Int        @default(0)
+  status             SyncStatus
+  message            String?
+}
+
+model Category {
+  id        String    @id @default(uuid())
+  name      String
+  slug      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  
+  vods      VodItem[]
+  
+  @@index([slug])
+}
+
+model VodItem {
+  id          String    @id @default(uuid())
+  externalId  String    @unique
+  title       String
+  description String?   @db.Text
+  posterUrl   String?
+  categoryId  String
+  streamUrl   String    @db.Text
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  category    Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  progress    WatchProgress[]
+  favorites   Favorite[]
+  
+  @@index([categoryId])
+  @@index([isActive])
+  @@index([externalId])
+}
+
+model WatchProgress {
+  id               String   @id @default(uuid())
+  userId           String
+  vodId            String
+  positionSeconds  Int      @default(0)
+  durationSeconds  Int      @default(0)
+  updatedAt        DateTime @updatedAt
+  
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vod              VodItem  @relation(fields: [vodId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, vodId])
+  @@index([userId])
+  @@index([vodId])
+}
+
+model Favorite {
+  id        String   @id @default(uuid())
+  userId    String
+  vodId     String
+  createdAt DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vod       VodItem  @relation(fields: [vodId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, vodId])
+  @@index([userId])
+  @@index([vodId])
+}
