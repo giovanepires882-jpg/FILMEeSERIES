@@ -120,17 +120,23 @@ export default function AdminPage() {
     }
 
     setSyncing(true)
+    setLastSyncStats(null)
     try {
       const res = await fetch('/api/admin/playlist/sync-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ m3uUrl }),
+        body: JSON.stringify({ m3uUrl, detectSeries }),
       })
 
       const data = await res.json()
 
       if (res.ok) {
-        toast.success('Sincronização concluída!')
+        if (data.stats) {
+          setLastSyncStats(data.stats)
+          toast.success(`Sincronização concluída! ${data.stats.movies} filmes, ${data.stats.series} séries, ${data.stats.episodes} episódios`)
+        } else {
+          toast.success('Sincronização concluída!')
+        }
         setM3uUrl('')
         loadData()
       } else {
