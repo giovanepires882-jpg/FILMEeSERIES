@@ -18,6 +18,7 @@ export default function WatchPage({ params }) {
   const [muted, setMuted] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
+  const [videoLoading, setVideoLoading] = useState(true)
   const progressInterval = useRef(null)
 
   useEffect(() => {
