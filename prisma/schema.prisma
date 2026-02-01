@@ -88,6 +88,8 @@ model SyncLog {
   finishedAt         DateTime?
   itemsUpserted      Int       @default(0)
   itemsInactivated   Int       @default(0)
+  seriesCreated      Int       @default(0)
+  episodesCreated    Int       @default(0)
   status             String
   message            String?
 }
@@ -99,10 +101,41 @@ model Category {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   
-  vods      VodItem[]
+  movies    Movie[]
+  series    Series[]
 }
 
-model VodItem {
+model Series {
+  id          String    @id @default(uuid())
+  externalId  String    @unique
+  title       String
+  posterUrl   String?
+  categoryId  String
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  category    Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  episodes    Episode[]
+}
+
+model Episode {
+  id             String    @id @default(uuid())
+  externalId     String    @unique
+  seriesId       String
+  seasonNumber   Int?
+  episodeNumber  Int?
+  title          String
+  streamUrl      String
+  containerType  String    @default("UNKNOWN")
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  
+  series         Series    @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+}
+
+model Movie {
   id          String    @id @default(uuid())
   externalId  String    @unique
   title       String
@@ -110,6 +143,7 @@ model VodItem {
   posterUrl   String?
   categoryId  String
   streamUrl   String
+  containerType String  @default("UNKNOWN")
   isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -122,25 +156,42 @@ model VodItem {
 model WatchProgress {
   id               String   @id @default(uuid())
   userId           String
-  vodId            String
+  contentType      String
+  contentId        String
   positionSeconds  Int      @default(0)
   durationSeconds  Int      @default(0)
   updatedAt        DateTime @updatedAt
   
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  vod              VodItem  @relation(fields: [vodId], references: [id], onDelete: Cascade)
+  movie            Movie?   @relation(fields: [contentId], references: [id], onDelete: Cascade)
   
-  @@unique([userId, vodId])
+  @@unique([userId, contentType, contentId])
 }
 
 model Favorite {
   id        String   @id @default(uuid())
   userId    String
-  vodId     String
+  contentType String
+  contentId String
   createdAt DateTime @default(now())
   
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  vod       VodItem  @relation(fields: [vodId], references: [id], onDelete: Cascade)
+  movie     Movie?   @relation(fields: [contentId], references: [id], onDelete: Cascade)
   
-  @@unique([userId, vodId])
+  @@unique([userId, contentType, contentId])
+}
+
+model MediaVariant {
+  id            String   @id @default(uuid())
+  contentType   String
+  contentId     String
+  sourceUrl     String
+  variantType   String
+  status        String   @default("PENDING")
+  outputPath    String?
+  lastError     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@unique([contentType, contentId, variantType])
 }
