@@ -204,6 +204,32 @@ export default function AdminPage() {
     }
   }
 
+  const handleFixSubscriptions = async () => {
+    if (!confirm('Corrigir todas as assinaturas de pagamentos aprovados?')) {
+      return
+    }
+
+    setFixingSubscriptions(true)
+    try {
+      const res = await fetch('/api/admin/subscriptions/fix', {
+        method: 'POST',
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        toast.success(`${data.fixed} assinaturas corrigidas! ${data.alreadyActive} já estavam ativas.`)
+        loadData()
+      } else {
+        toast.error(data.error || 'Erro ao corrigir')
+      }
+    } catch (error) {
+      toast.error('Erro ao corrigir assinaturas')
+    } finally {
+      setFixingSubscriptions(false)
+    }
+  }
+
   if (loading && !user) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
