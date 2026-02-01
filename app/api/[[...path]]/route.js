@@ -1186,7 +1186,9 @@ export async function POST(req, { params }) {
   
   // Admin
   if (path === 'admin/playlist/sync') return handleAdminSync(req)
+  if (path === 'admin/playlist/sync-url') return handleAdminSyncWithUrl(req)
   if (path === 'admin/vod/toggle') return handleAdminToggleVod(req)
+  if (path === 'admin/vods/delete') return handleAdminDeleteVods(req)
   
   return NextResponse.json({ error: 'Not found' }, { status: 404 })
 }
