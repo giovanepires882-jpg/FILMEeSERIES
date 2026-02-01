@@ -251,6 +251,16 @@ export default function WatchPage({ params }) {
           playsInline
         />
 
+        {/* Loading Spinner */}
+        {videoLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-16 h-16 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
+              <span className="text-white text-lg">Carregando vídeo...</span>
+            </div>
+          </div>
+        )}
+
         {/* Controls */}
         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-4">
           <div className="flex items-center gap-4">
