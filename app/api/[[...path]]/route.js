@@ -1152,6 +1152,7 @@ export async function GET(req, { params }) {
   // Admin
   if (path === 'admin/sync/logs') return handleAdminSyncLogs(req)
   if (path === 'admin/users') return handleAdminUsers(req)
+  if (path === 'admin/vods') return handleAdminGetVods(req)
   
   return NextResponse.json({ error: 'Not found' }, { status: 404 })
 }
