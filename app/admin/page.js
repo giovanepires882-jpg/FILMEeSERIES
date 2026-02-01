@@ -13,9 +13,14 @@ export default function AdminPage() {
   const [user, setUser] = useState(null)
   const [syncLogs, setSyncLogs] = useState([])
   const [users, setUsers] = useState([])
+  const [categories, setCategories] = useState([])
+  const [vods, setVods] = useState([])
+  const [vodsPagination, setVodsPagination] = useState({})
   const [syncing, setSyncing] = useState(false)
   const [activeTab, setActiveTab] = useState('sync')
   const [loading, setLoading] = useState(true)
+  const [m3uUrl, setM3uUrl] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState('')
 
   useEffect(() => {
     checkAuth()
