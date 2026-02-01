@@ -401,6 +401,157 @@ async function handleGetVodById(vodId) {
   }
 }
 
+// ============ SERIES ============
+async function handleGetSeries(req) {
+  try {
+    const { searchParams } = new URL(req.url)
+    const category = searchParams.get('category') || ''
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 50)
+    
+    const where = {
+      isActive: true,
+      ...(category && {
+        category: { slug: category }
+      })
+    }
+    
+    const [series, total] = await Promise.all([
+      prisma.series.findMany({
+        where,
+        select: {
+          id: true,
+          title: true,
+          posterUrl: true,
+          category: {
+            select: { name: true, slug: true }
+          },
+          _count: {
+            select: { episodes: { where: { isActive: true } } }
+          },
+          createdAt: true
+        },
+        orderBy: { title: 'asc' },
+        skip: (page - 1) * limit,
+        take: limit
+      }),
+      prisma.series.count({ where })
+    ])
+    
+    const formattedSeries = series.map(s => ({
+      ...s,
+      episodeCount: s._count.episodes,
+      _count: undefined
+    }))
+    
+    return NextResponse.json({
+      series: formattedSeries,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    })
+  } catch (error) {
+    console.error('Series error:', error)
+    return NextResponse.json({ error: 'Failed to fetch series' }, { status: 500 })
+  }
+}
+
+async function handleGetSeriesById(seriesId) {
+  try {
+    const series = await prisma.series.findUnique({
+      where: { id: seriesId },
+      select: {
+        id: true,
+        title: true,
+        posterUrl: true,
+        isActive: true,
+        category: {
+          select: { name: true, slug: true }
+        },
+        episodes: {
+          where: { isActive: true },
+          select: {
+            id: true,
+            title: true,
+            seasonNumber: true,
+            episodeNumber: true,
+            streamUrl: true
+          },
+          orderBy: [
+            { seasonNumber: 'asc' },
+            { episodeNumber: 'asc' }
+          ]
+        },
+        createdAt: true
+      }
+    })
+    
+    if (!series || !series.isActive) {
+      return NextResponse.json({ error: 'Series not found' }, { status: 404 })
+    }
+    
+    // Agrupar episódios por temporada
+    const seasons = {}
+    for (const ep of series.episodes) {
+      const seasonNum = ep.seasonNumber || 1
+      if (!seasons[seasonNum]) {
+        seasons[seasonNum] = []
+      }
+      seasons[seasonNum].push(ep)
+    }
+    
+    return NextResponse.json({
+      series: {
+        id: series.id,
+        title: series.title,
+        posterUrl: series.posterUrl,
+        category: series.category,
+        createdAt: series.createdAt,
+        totalEpisodes: series.episodes.length,
+        totalSeasons: Object.keys(seasons).length,
+        seasons
+      }
+    })
+  } catch (error) {
+    console.error('Series by ID error:', error)
+    return NextResponse.json({ error: 'Failed to fetch series' }, { status: 500 })
+  }
+}
+
+// ============ EPISODE STREAM ============
+async function handleGetEpisodeStream(req, episodeId) {
+  try {
+    const user = await auth.requireAuth(req)
+    
+    // Check subscription
+    const hasAccess = await subscription.checkActiveSubscription(user.id)
+    if (!hasAccess) {
+      return NextResponse.json({ error: 'Assinatura inativa ou expirada' }, { status: 403 })
+    }
+    
+    // Get Episode
+    const episode = await prisma.episode.findUnique({
+      where: { id: episodeId },
+      select: { streamUrl: true, isActive: true, title: true }
+    })
+    
+    if (!episode || !episode.isActive) {
+      return NextResponse.json({ error: 'Episode not found' }, { status: 404 })
+    }
+    
+    return NextResponse.json({ url: episode.streamUrl, title: episode.title })
+  } catch (error) {
+    console.error('Episode stream error:', error)
+    if (error.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    return NextResponse.json({ error: 'Failed to get stream' }, { status: 500 })
+  }
+}
+
 // ============ STREAM (GATING) ============
 async function handleGetStream(req, vodId) {
   try {
