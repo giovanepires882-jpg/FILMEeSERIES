@@ -79,23 +79,70 @@ export default function WatchPage({ params }) {
     const video = videoRef.current
     if (!video) return
 
+    console.log('Initializing player with URL:', streamUrl)
+
+    // Verificar se é HLS ou MP4 direto
     if (streamUrl.includes('.m3u8')) {
       // HLS stream
+      console.log('Detected HLS stream')
       if (Hls.isSupported()) {
-        const hls = new Hls()
+        const hls = new Hls({
+          debug: false,
+          enableWorker: true,
+          lowLatencyMode: false,
+          backBufferLength: 90,
+        })
         hls.loadSource(streamUrl)
         hls.attachMedia(video)
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          console.log('HLS ready')
+          console.log('HLS manifest parsed, ready to play')
+        })
+        hls.on(Hls.Events.ERROR, (event, data) => {
+          console.error('HLS error:', data)
+          if (data.fatal) {
+            toast.error('Erro ao carregar vídeo')
+          }
         })
       } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
         // Native HLS support (Safari)
+        console.log('Using native HLS support')
         video.src = streamUrl
+      } else {
+        console.error('HLS not supported')
+        toast.error('Seu navegador não suporta este formato de vídeo')
       }
     } else {
-      // Direct stream
+      // MP4 direto ou outro formato
+      console.log('Direct video stream (MP4 or other)')
       video.src = streamUrl
+      video.load()
     }
+
+    // Error handling
+    video.addEventListener('error', (e) => {
+      console.error('Video error:', e, video.error)
+      if (video.error) {
+        const errorMessages = {
+          1: 'Erro ao carregar vídeo: Operação abortada',
+          2: 'Erro de rede ao carregar vídeo',
+          3: 'Erro ao decodificar vídeo',
+          4: 'Formato de vídeo não suportado',
+        }
+        toast.error(errorMessages[video.error.code] || 'Erro ao reproduzir vídeo')
+      }
+    })
+
+    video.addEventListener('loadstart', () => {
+      console.log('Video loading started')
+    })
+
+    video.addEventListener('loadedmetadata', () => {
+      console.log('Video metadata loaded')
+    })
+
+    video.addEventListener('canplay', () => {
+      console.log('Video can play')
+    })
 
     // Start progress tracking
     progressInterval.current = setInterval(() => {
