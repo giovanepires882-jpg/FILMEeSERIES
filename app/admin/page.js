@@ -324,6 +324,23 @@ export default function AdminPage() {
                     disabled={syncing}
                   />
                 </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="detect-series"
+                    checked={detectSeries}
+                    onCheckedChange={(checked) => setDetectSeries(!!checked)}
+                    disabled={syncing}
+                  />
+                  <Label htmlFor="detect-series" className="text-white cursor-pointer flex items-center gap-2">
+                    <Tv className="h-4 w-4 text-blue-400" />
+                    Detectar Séries e Episódios automaticamente
+                  </Label>
+                </div>
+                <p className="text-gray-500 text-sm ml-6">
+                  Quando ativado, identifica padrões como "S01E02", "1x02", "Temporada 1 Ep 2" nos títulos
+                </p>
+                
                 <Button
                   onClick={handleSyncWithUrl}
                   disabled={syncing || !m3uUrl.trim()}
@@ -332,6 +349,31 @@ export default function AdminPage() {
                   <Upload className="mr-2 h-4 w-4" />
                   {syncing ? 'Sincronizando...' : 'Sincronizar com Esta URL'}
                 </Button>
+                
+                {/* Stats from last sync */}
+                {lastSyncStats && (
+                  <div className="mt-4 p-4 bg-gray-800 rounded-lg">
+                    <h3 className="text-white font-semibold mb-2">Última Sincronização:</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div className="flex items-center gap-2">
+                        <Film className="h-4 w-4 text-green-400" />
+                        <span className="text-white">{lastSyncStats.movies} filmes</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Tv className="h-4 w-4 text-blue-400" />
+                        <span className="text-white">{lastSyncStats.series} séries</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <PlayCircle className="h-4 w-4 text-purple-400" />
+                        <span className="text-white">{lastSyncStats.episodes} episódios</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Trash2 className="h-4 w-4 text-red-400" />
+                        <span className="text-white">{lastSyncStats.inactivated} inativos</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
