@@ -941,6 +941,177 @@ async function handleAdminToggleVod(req) {
   }
 }
 
+async function handleAdminDeleteVods(req) {
+  try {
+    const user = await auth.requireAdmin(req)
+    const body = await req.json()
+    const { categoryId, deleteAll } = body
+    
+    if (deleteAll) {
+      // Deletar todos os VODs
+      const result = await prisma.vodItem.deleteMany({})
+      return NextResponse.json({ success: true, deleted: result.count })
+    } else if (categoryId) {
+      // Deletar por categoria
+      const result = await prisma.vodItem.deleteMany({
+        where: { categoryId }
+      })
+      return NextResponse.json({ success: true, deleted: result.count })
+    } else {
+      return NextResponse.json({ error: 'Specify categoryId or deleteAll' }, { status: 400 })
+    }
+  } catch (error) {
+    console.error('Admin delete VODs error:', error)
+    if (error.message === 'Unauthorized' || error.message === 'Forbidden: Admin only') {
+      return NextResponse.json({ error: error.message }, { status: 403 })
+    }
+    return NextResponse.json({ error: 'Failed to delete VODs' }, { status: 500 })
+  }
+}
+
+async function handleAdminSyncWithUrl(req) {
+  try {
+    const user = await auth.requireAdmin(req)
+    const body = await req.json()
+    const { m3uUrl } = body
+    
+    if (!m3uUrl) {
+      return NextResponse.json({ error: 'M3U URL required' }, { status: 400 })
+    }
+    
+    const startedAt = new Date()
+    
+    try {
+      // Parse M3U
+      const items = await fetchAndParseM3U(m3uUrl)
+      console.log(`Parsed ${items.length} items from M3U`)
+      
+      let itemsUpserted = 0
+      let itemsInactivated = 0
+      
+      const externalIds = new Set()
+      
+      // Upsert items
+      for (const item of items) {
+        externalIds.add(item.externalId)
+        
+        // Upsert category
+        const category = await prisma.category.upsert({
+          where: { slug: item.category.toLowerCase().replace(/[^a-z0-9]+/g, '-') },
+          update: { name: item.category },
+          create: {
+            name: item.category,
+            slug: item.category.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+          },
+        })
+        
+        // Upsert VOD
+        await prisma.vodItem.upsert({
+          where: { externalId: item.externalId },
+          update: {
+            title: item.title,
+            posterUrl: item.posterUrl,
+            categoryId: category.id,
+            streamUrl: item.streamUrl,
+            isActive: true,
+          },
+          create: {
+            externalId: item.externalId,
+            title: item.title,
+            posterUrl: item.posterUrl,
+            categoryId: category.id,
+            streamUrl: item.streamUrl,
+            isActive: true,
+          },
+        })
+        
+        itemsUpserted++
+      }
+      
+      // Inativar itens que sumiram
+      const inactivated = await prisma.vodItem.updateMany({
+        where: {
+          externalId: { notIn: Array.from(externalIds) },
+          isActive: true,
+        },
+        data: { isActive: false },
+      })
+      
+      itemsInactivated = inactivated.count
+      
+      const syncLog = await prisma.syncLog.create({
+        data: {
+          startedAt,
+          finishedAt: new Date(),
+          itemsUpserted,
+          itemsInactivated,
+          status: 'SUCCESS',
+          message: `Synced ${itemsUpserted} items, inactivated ${itemsInactivated}`,
+        },
+      })
+      
+      return NextResponse.json({ success: true, syncLog })
+    } catch (error) {
+      console.error('Sync error:', error)
+      
+      const syncLog = await prisma.syncLog.create({
+        data: {
+          startedAt,
+          finishedAt: new Date(),
+          itemsUpserted: 0,
+          itemsInactivated: 0,
+          status: 'FAIL',
+          message: error.message,
+        },
+      })
+      
+      return NextResponse.json({ error: 'Sync failed', details: error.message, syncLog }, { status: 500 })
+    }
+  } catch (error) {
+    console.error('Admin sync with URL error:', error)
+    if (error.message === 'Unauthorized' || error.message === 'Forbidden: Admin only') {
+      return NextResponse.json({ error: error.message }, { status: 403 })
+    }
+    return NextResponse.json({ error: 'Failed to sync' }, { status: 500 })
+  }
+}
+
+async function handleAdminGetVods(req) {
+  try {
+    const user = await auth.requireAdmin(req)
+    const { searchParams } = new URL(req.url)
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '50')
+    const categoryId = searchParams.get('categoryId') || ''
+    
+    const where = categoryId ? { categoryId } : {}
+    
+    const [vods, total] = await Promise.all([
+      prisma.vodItem.findMany({
+        where,
+        include: {
+          category: { select: { name: true, slug: true } }
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.vodItem.count({ where }),
+    ])
+    
+    return NextResponse.json({
+      vods,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
+    })
+  } catch (error) {
+    console.error('Admin get VODs error:', error)
+    if (error.message === 'Unauthorized' || error.message === 'Forbidden: Admin only') {
+      return NextResponse.json({ error: error.message }, { status: 403 })
+    }
+    return NextResponse.json({ error: 'Failed to get VODs' }, { status: 500 })
+  }
+}
+
 // ============ ROUTER ============
 export async function GET(req, { params }) {
   const path = params.path?.join('/') || ''
