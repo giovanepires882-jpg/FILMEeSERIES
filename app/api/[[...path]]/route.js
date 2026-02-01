@@ -230,23 +230,19 @@ async function handleGetVods(req) {
     const page = parseInt(searchParams.get('page') || '1')
     const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 50) // Max 50
     
+    // Se tem busca, usar busca otimizada com startsWith
+    if (q) {
+      return handleSearchVods(req)
+    }
+    
     const where = {
       isActive: true,
-      ...(q && {
-        title: {
-          contains: q,
-          mode: 'insensitive',
-        },
-      }),
       ...(category && {
         category: {
           slug: category,
         },
       }),
     }
-    
-    // Se tem busca, limitar a 100 resultados para velocidade
-    const maxResults = q ? 100 : undefined
     
     const [vods, total] = await Promise.all([
       prisma.vodItem.findMany({
@@ -266,10 +262,9 @@ async function handleGetVods(req) {
         },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
-        take: maxResults ? Math.min(limit, maxResults) : limit,
+        take: limit,
       }),
-      // Count otimizado - se busca, limitar
-      q ? Promise.resolve(Math.min(await prisma.vodItem.count({ where }), maxResults)) : prisma.vodItem.count({ where }),
+      prisma.vodItem.count({ where }),
     ])
     
     return NextResponse.json({
@@ -277,13 +272,101 @@ async function handleGetVods(req) {
       pagination: {
         page,
         limit,
-        total: Math.min(total, maxResults || total),
-        totalPages: Math.ceil(Math.min(total, maxResults || total) / limit),
+        total,
+        totalPages: Math.ceil(total / limit),
       },
     })
   } catch (error) {
     console.error('VODs error:', error)
     return NextResponse.json({ error: 'Failed to fetch VODs' }, { status: 500 })
+  }
+}
+
+// ============ SEARCH (startsWith, case-insensitive para SQLite) ============
+async function handleSearchVods(req) {
+  try {
+    const { searchParams } = new URL(req.url)
+    const q = searchParams.get('q') || ''
+    const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100)
+    
+    if (!q.trim()) {
+      return NextResponse.json({ vods: [], series: [], total: 0 })
+    }
+    
+    const searchTerm = q.trim().toLowerCase()
+    
+    // Buscar VODs usando raw query para case-insensitive no SQLite
+    // startsWith = título começa com o termo de busca
+    const vods = await prisma.$queryRaw`
+      SELECT 
+        v.id,
+        v.title,
+        v.description,
+        v.posterUrl,
+        v.createdAt,
+        c.name as categoryName,
+        c.slug as categorySlug
+      FROM VodItem v
+      LEFT JOIN Category c ON v.categoryId = c.id
+      WHERE v.isActive = 1 
+        AND LOWER(v.title) LIKE ${searchTerm + '%'}
+      ORDER BY v.title ASC
+      LIMIT ${limit}
+    `
+    
+    // Buscar Séries também
+    const series = await prisma.$queryRaw`
+      SELECT 
+        s.id,
+        s.title,
+        s.posterUrl,
+        s.createdAt,
+        c.name as categoryName,
+        c.slug as categorySlug,
+        (SELECT COUNT(*) FROM Episode e WHERE e.seriesId = s.id AND e.isActive = 1) as episodeCount
+      FROM Series s
+      LEFT JOIN Category c ON s.categoryId = c.id
+      WHERE s.isActive = 1 
+        AND LOWER(s.title) LIKE ${searchTerm + '%'}
+      ORDER BY s.title ASC
+      LIMIT ${limit}
+    `
+    
+    // Formatar resposta
+    const formattedVods = vods.map(v => ({
+      id: v.id,
+      title: v.title,
+      description: v.description,
+      posterUrl: v.posterUrl,
+      createdAt: v.createdAt,
+      type: 'movie',
+      category: {
+        name: v.categoryName,
+        slug: v.categorySlug
+      }
+    }))
+    
+    const formattedSeries = series.map(s => ({
+      id: s.id,
+      title: s.title,
+      posterUrl: s.posterUrl,
+      createdAt: s.createdAt,
+      type: 'series',
+      episodeCount: Number(s.episodeCount) || 0,
+      category: {
+        name: s.categoryName,
+        slug: s.categorySlug
+      }
+    }))
+    
+    return NextResponse.json({
+      vods: formattedVods,
+      series: formattedSeries,
+      total: formattedVods.length + formattedSeries.length
+    })
+  } catch (error) {
+    console.error('Search error:', error)
+    return NextResponse.json({ error: 'Failed to search', details: error.message }, { status: 500 })
   }
 }
 
