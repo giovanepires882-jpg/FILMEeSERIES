@@ -101,3 +101,156 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: |
+  Sistema de streaming estilo Netflix com:
+  1. Busca funcional (startsWith, case-insensitive)
+  2. Séries e Episódios identificados automaticamente do M3U
+  3. UI para exibir séries com lista de episódios por temporada
+  4. Player de vídeo compatível com MP4, M3U8 e MKV (via ffmpeg)
+  5. Sincronização M3U com categorias e detecção de séries
+  6. Assinaturas com Mercado Pago
+
+backend:
+  - task: "Search API - startsWith case-insensitive"
+    implemented: true
+    working: "NA"
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implementada busca com raw SQL para SQLite usando LIKE e LOWER() para case-insensitive startsWith"
+
+  - task: "Series API - Get all series"
+    implemented: true
+    working: "NA"
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Endpoint GET /api/series implementado para listar séries"
+
+  - task: "Series API - Get series by ID with episodes"
+    implemented: true
+    working: "NA"
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Endpoint GET /api/series/:id implementado com episódios agrupados por temporada"
+
+  - task: "Episode Stream API"
+    implemented: true
+    working: "NA"
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Endpoint GET /api/episode/:id/stream para obter URL do stream do episódio"
+
+  - task: "M3U Sync with Series Detection"
+    implemented: true
+    working: "NA"
+    file: "/app/lib/m3u-parser.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Parser M3U atualizado com detecção de padrões de episódios (S01E02, 1x02, etc.)"
+
+frontend:
+  - task: "Search Page UI"
+    implemented: true
+    working: "NA"
+    file: "/app/app/search/page.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Página de busca atualizada para mostrar filmes e séries separadamente"
+
+  - task: "Series Detail Page"
+    implemented: true
+    working: "NA"
+    file: "/app/app/series/[id]/page.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Nova página para exibir série com lista de episódios por temporada"
+
+  - task: "Episode Watch Page"
+    implemented: true
+    working: "NA"
+    file: "/app/app/watch/episode/[id]/page.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Nova página para reproduzir episódios de séries"
+
+  - task: "Admin Page - Series Detection Option"
+    implemented: true
+    working: "NA"
+    file: "/app/app/admin/page.js"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Adicionada opção de detectar séries automaticamente na sincronização"
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "Search API - startsWith case-insensitive"
+    - "Series API - Get all series"
+    - "Series API - Get series by ID with episodes"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: |
+      Implementei as seguintes funcionalidades:
+      1. Busca com startsWith case-insensitive usando raw SQL para SQLite
+      2. API de séries (GET /api/series e GET /api/series/:id)
+      3. API de stream de episódios (GET /api/episode/:id/stream)
+      4. Parser M3U com detecção automática de séries/episódios
+      5. UI de busca mostrando filmes e séries separadamente
+      6. Página de detalhes de série com lista de episódios por temporada
+      7. Página de player para episódios
+      
+      Para testar:
+      - GET /api/vods?q=star&limit=10 (deve retornar filmes que começam com "star")
+      - GET /api/series (deve retornar lista de séries)
+      - GET /api/series/:id (deve retornar série com episódios agrupados)
+      
+      Credenciais admin: giovanepires17@hotmail.com / admin123
