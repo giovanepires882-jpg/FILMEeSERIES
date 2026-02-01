@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Play, Info, LogOut, User, Menu, X } from 'lucide-react'
+import { Play, Info, LogOut, User, Menu, X, Film, Tv, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import VodCarousel from '@/components/vod-carousel'
@@ -30,11 +30,11 @@ export default function HomePage() {
         const data = await res.json()
         setUser(data.user)
         setSubscription(data.subscription)
-      } else {
-        router.push('/login')
       }
+      // NÃO redireciona para login se não estiver autenticado
+      // Permite navegar pelo catálogo sem login
     } catch (error) {
-      router.push('/login')
+      // Ignora erro - usuário pode navegar sem login
     }
   }
 
@@ -67,7 +67,9 @@ export default function HomePage() {
   const handleLogout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' })
-      router.push('/login')
+      setUser(null)
+      setSubscription(null)
+      toast.success('Você saiu da conta')
     } catch (error) {
       toast.error('Erro ao sair')
     }
@@ -94,18 +96,22 @@ export default function HomePage() {
               <Link href="/" className="text-white hover:text-gray-300 transition">
                 Início
               </Link>
-              <Link href="/search" className="text-white hover:text-gray-300 transition">
+              <Link href="/filmes" className="text-white hover:text-gray-300 transition flex items-center gap-1">
+                <Film className="h-4 w-4" />
+                Filmes
+              </Link>
+              <Link href="/series" className="text-white hover:text-gray-300 transition flex items-center gap-1">
+                <Tv className="h-4 w-4" />
+                Séries
+              </Link>
+              <Link href="/search" className="text-white hover:text-gray-300 transition flex items-center gap-1">
+                <Search className="h-4 w-4" />
                 Buscar
               </Link>
-              {subscription?.isActive && (
-                <span className="text-green-500 text-sm">
+              {user && subscription?.isActive && (
+                <span className="text-green-500 text-sm flex items-center">
                   ✓ Assinatura Ativa
                 </span>
-              )}
-              {!subscription?.isActive && (
-                <Link href="/account" className="text-yellow-500 text-sm hover:text-yellow-400">
-                  ⚠ Ativar Assinatura
-                </Link>
               )}
             </nav>
           </div>
@@ -118,11 +124,32 @@ export default function HomePage() {
                 </Button>
               </Link>
             )}
-            <Link href="/account">
-              <Button variant="ghost" size="icon" className="text-white">
-                <User className="h-5 w-5" />
-              </Button>
-            </Link>
+            
+            {user ? (
+              <>
+                <Link href="/account">
+                  <Button variant="ghost" size="icon" className="text-white">
+                    <User className="h-5 w-5" />
+                  </Button>
+                </Link>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleLogout}
+                  className="hidden md:flex text-gray-400 hover:text-white"
+                >
+                  <LogOut className="h-4 w-4 mr-1" />
+                  Sair
+                </Button>
+              </>
+            ) : (
+              <Link href="/login">
+                <Button variant="default" size="sm" className="bg-red-600 hover:bg-red-700">
+                  Entrar
+                </Button>
+              </Link>
+            )}
+            
             <Button
               variant="ghost"
               size="icon"
@@ -138,23 +165,40 @@ export default function HomePage() {
         {mobileMenuOpen && (
           <div className="md:hidden bg-black/95 border-t border-gray-800">
             <nav className="container mx-auto px-4 py-4 flex flex-col gap-4">
-              <Link href="/" className="text-white hover:text-gray-300">
+              <Link href="/" className="text-white hover:text-gray-300 flex items-center gap-2">
                 Início
               </Link>
-              <Link href="/search" className="text-white hover:text-gray-300">
+              <Link href="/filmes" className="text-white hover:text-gray-300 flex items-center gap-2">
+                <Film className="h-4 w-4" />
+                Filmes
+              </Link>
+              <Link href="/series" className="text-white hover:text-gray-300 flex items-center gap-2">
+                <Tv className="h-4 w-4" />
+                Séries
+              </Link>
+              <Link href="/search" className="text-white hover:text-gray-300 flex items-center gap-2">
+                <Search className="h-4 w-4" />
                 Buscar
               </Link>
-              <Link href="/account" className="text-white hover:text-gray-300">
-                Minha Conta
-              </Link>
-              {user?.role === 'ADMIN' && (
-                <Link href="/admin" className="text-white hover:text-gray-300">
-                  Admin
+              {user ? (
+                <>
+                  <Link href="/account" className="text-white hover:text-gray-300">
+                    Minha Conta
+                  </Link>
+                  {user?.role === 'ADMIN' && (
+                    <Link href="/admin" className="text-white hover:text-gray-300">
+                      Admin
+                    </Link>
+                  )}
+                  <button onClick={handleLogout} className="text-left text-red-500 hover:text-red-400">
+                    Sair
+                  </button>
+                </>
+              ) : (
+                <Link href="/login" className="text-red-500 hover:text-red-400">
+                  Entrar / Cadastrar
                 </Link>
               )}
-              <button onClick={handleLogout} className="text-left text-red-500 hover:text-red-400">
-                Sair
-              </button>
             </nav>
           </div>
         )}
@@ -198,13 +242,15 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Continue Watching */}
-      <div className="relative z-20 -mt-32 md:-mt-40">
-        <ContinueWatching />
-      </div>
+      {/* Continue Watching - only show if logged in */}
+      {user && (
+        <div className="relative z-20 -mt-32 md:-mt-40">
+          <ContinueWatching />
+        </div>
+      )}
 
       {/* Categories Carousels */}
-      <div className="relative z-20 space-y-8 pb-20">
+      <div className={`relative z-20 space-y-8 pb-20 ${!user ? 'pt-8' : ''}`}>
         {categories.map((category) => (
           <VodCarousel
             key={category.id}
