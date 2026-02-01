@@ -80,23 +80,111 @@ export default function WatchPage({ params }) {
     const video = videoRef.current
     if (!video) return
 
-    console.log('Initializing player with URL:', streamUrl)
+    console.log('🎬 Initializing player with URL:', streamUrl)
 
     // Detectar formato do arquivo
     const fileExtension = streamUrl.split('.').pop().split('?')[0].toLowerCase()
-    console.log('File extension:', fileExtension)
+    console.log('📹 File extension:', fileExtension)
 
-    // Formatos suportados diretamente pelo HTML5
-    const nativeFormats = ['mp4', 'webm', 'ogg']
-    const hlsFormats = ['m3u8', 'm3u']
-    const containerFormats = ['mkv', 'avi', 'mov', 'flv', 'wmv']
+    // Limpar event listeners antigos
+    video.removeEventListener('error', handleVideoError)
+    video.removeEventListener('loadedmetadata', handleLoadedMetadata)
+    video.removeEventListener('canplay', handleCanPlay)
+    video.removeEventListener('playing', handlePlaying)
+    video.removeEventListener('waiting', handleWaiting)
 
-    if (hlsFormats.includes(fileExtension) || streamUrl.includes('.m3u8')) {
-      // HLS stream
-      console.log('Detected HLS stream')
+    // Função de erro
+    function handleVideoError(e) {
+      console.error('❌ Video error:', video.error)
+      
+      if (video.error && video.error.code === 4) {
+        // Formato não suportado - tentar forçar com diferentes tipos MIME
+        console.log('⚠️ Format not supported, trying alternative approaches...')
+        
+        // Tentar diferentes tipos MIME
+        const mimeTypes = [
+          'video/mp4',
+          'video/x-matroska',
+          'video/webm',
+          'application/x-mpegURL',
+          ''
+        ]
+        
+        let triedCount = 0
+        const tryNextMime = () => {
+          if (triedCount < mimeTypes.length) {
+            const mime = mimeTypes[triedCount]
+            console.log(`🔄 Trying with MIME type: ${mime || 'auto'}`)
+            
+            video.src = ''
+            video.load()
+            
+            if (mime) {
+              video.type = mime
+            }
+            video.src = streamUrl
+            video.load()
+            
+            triedCount++
+          } else {
+            // Todas tentativas falharam
+            console.error('❌ All playback attempts failed')
+            toast.error('Este vídeo não pode ser reproduzido no seu navegador. Tente outro navegador (Chrome recomendado) ou escolha outro vídeo.')
+            setVideoLoading(false)
+          }
+        }
+        
+        // Tentar primeira alternativa
+        setTimeout(tryNextMime, 1000)
+      } else {
+        const errorMessages = {
+          1: 'Carregamento abortado',
+          2: 'Erro de rede',
+          3: 'Erro ao decodificar',
+          4: 'Formato não suportado',
+        }
+        toast.error(errorMessages[video.error?.code] || 'Erro ao reproduzir')
+      }
+    }
+
+    function handleLoadedMetadata() {
+      console.log('✅ Video metadata loaded')
+    }
+
+    function handleCanPlay() {
+      console.log('✅ Video can play')
+      setVideoLoading(false)
+      // Tentar autoplay
+      video.play().catch(e => {
+        console.log('⚠️ Autoplay prevented:', e)
+        setVideoLoading(false)
+      })
+    }
+
+    function handlePlaying() {
+      setVideoLoading(false)
+      setPlaying(true)
+    }
+
+    function handleWaiting() {
+      setVideoLoading(true)
+    }
+
+    // Adicionar listeners
+    video.addEventListener('error', handleVideoError)
+    video.addEventListener('loadedmetadata', handleLoadedMetadata)
+    video.addEventListener('canplay', handleCanPlay)
+    video.addEventListener('playing', handlePlaying)
+    video.addEventListener('waiting', handleWaiting)
+
+    // Configurar vídeo
+    setVideoLoading(true)
+    
+    // Para HLS usar hls.js
+    if (fileExtension === 'm3u8' || fileExtension === 'm3u') {
       if (Hls.isSupported()) {
+        console.log('📡 Using HLS.js')
         const hls = new Hls({
-          debug: false,
           enableWorker: true,
           lowLatencyMode: false,
           backBufferLength: 90,
@@ -104,107 +192,47 @@ export default function WatchPage({ params }) {
         hls.loadSource(streamUrl)
         hls.attachMedia(video)
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          console.log('HLS manifest parsed, ready to play')
-          video.play().catch(e => console.log('Autoplay prevented:', e))
+          console.log('✅ HLS manifest parsed')
+          video.play().catch(e => console.log('Autoplay prevented'))
         })
         hls.on(Hls.Events.ERROR, (event, data) => {
-          console.error('HLS error:', data)
           if (data.fatal) {
-            toast.error('Erro ao carregar vídeo HLS')
+            console.error('❌ Fatal HLS error:', data)
+            toast.error('Erro ao carregar stream')
           }
         })
       } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        // Native HLS support (Safari)
-        console.log('Using native HLS support')
+        console.log('🍎 Using native HLS')
         video.src = streamUrl
-        video.play().catch(e => console.log('Autoplay prevented:', e))
-      } else {
-        console.error('HLS not supported')
-        toast.error('Seu navegador não suporta este formato de vídeo')
+        video.load()
       }
-    } else if (nativeFormats.includes(fileExtension)) {
-      // Formatos nativos (MP4, WebM, OGG)
-      console.log('Direct video stream (native format):', fileExtension)
-      video.src = streamUrl
-      video.load()
-      video.play().catch(e => console.log('Autoplay prevented:', e))
-    } else if (containerFormats.includes(fileExtension)) {
-      // Formatos container (MKV, AVI, etc)
-      // Tentar reproduzir diretamente, alguns navegadores suportam
-      console.log('Container format detected:', fileExtension, '- attempting direct playback')
-      video.src = streamUrl
-      video.load()
-      
-      // Se não carregar em 5s, mostrar erro
-      const timeout = setTimeout(() => {
-        if (video.readyState < 2) {
-          console.error('Format not supported by browser:', fileExtension)
-          toast.error(`Formato ${fileExtension.toUpperCase()} não suportado. Use MP4 ou M3U8.`)
-        }
-      }, 5000)
-      
-      video.addEventListener('loadedmetadata', () => {
-        clearTimeout(timeout)
-        video.play().catch(e => console.log('Autoplay prevented:', e))
-      }, { once: true })
     } else {
-      // Formato desconhecido, tentar mesmo assim
-      console.log('Unknown format, attempting playback:', fileExtension)
-      video.src = streamUrl
+      // Para outros formatos, tentar direto
+      console.log('🎥 Using direct playback')
+      
+      // Limpar source antigo
+      video.src = ''
       video.load()
-      video.play().catch(e => console.log('Autoplay prevented:', e))
+      
+      // Definir novo source
+      video.src = streamUrl
+      
+      // Para MKV, adicionar type explícito
+      if (fileExtension === 'mkv') {
+        video.type = 'video/x-matroska'
+      } else if (fileExtension === 'mp4') {
+        video.type = 'video/mp4'
+      }
+      
+      video.load()
     }
 
-    // Error handling
-    video.addEventListener('error', (e) => {
-      console.error('Video error:', e, video.error)
-      if (video.error) {
-        const errorMessages = {
-          1: 'Carregamento abortado',
-          2: 'Erro de rede ao carregar vídeo',
-          3: 'Erro ao decodificar vídeo',
-          4: 'Formato não suportado pelo navegador',
-        }
-        const msg = errorMessages[video.error.code] || 'Erro ao reproduzir'
-        toast.error(msg)
-        console.error('Error details:', {
-          code: video.error.code,
-          message: video.error.message,
-          url: streamUrl,
-          format: fileExtension
-        })
-      }
-    })
-
-    video.addEventListener('loadstart', () => {
-      console.log('Video loading started')
-      setVideoLoading(true)
-    })
-
-    video.addEventListener('loadedmetadata', () => {
-      console.log('Video metadata loaded')
-    })
-
-    video.addEventListener('canplay', () => {
-      console.log('Video can play')
-      setVideoLoading(false)
-    })
-
-    video.addEventListener('playing', () => {
-      setVideoLoading(false)
-      setPlaying(true)
-    })
-
-    video.addEventListener('waiting', () => {
-      setVideoLoading(true)
-    })
-
-    // Start progress tracking
+    // Progress tracking
     progressInterval.current = setInterval(() => {
       if (video.currentTime > 0 && video.duration > 0) {
         saveProgress(Math.floor(video.currentTime), Math.floor(video.duration))
       }
-    }, 10000) // Save every 10 seconds
+    }, 10000)
 
     video.addEventListener('timeupdate', () => {
       setCurrentTime(video.currentTime)
