@@ -822,20 +822,73 @@ async function handleBillingStatus(req) {
       return NextResponse.json({ error: 'Payment not found' }, { status: 404 })
     }
     
-    // Opcional: consultar MP se ainda PENDING
+    // Se ainda PENDING, consultar MP e atualizar
     if (payment.status === 'PENDING') {
       try {
         const mpDetails = await mp.getPaymentDetails(mpPaymentId)
-        if (mpDetails.status !== payment.status) {
-          // Atualizar
+        const newStatus = mpDetails.status.toUpperCase()
+        
+        if (newStatus !== payment.status) {
+          console.log(`📊 Payment ${mpPaymentId} status changed: ${payment.status} → ${newStatus}`)
+          
+          // Atualizar pagamento
           const updated = await prisma.payment.update({
             where: { mpPaymentId },
-            data: { status: mpDetails.status.toUpperCase() },
+            data: { 
+              status: newStatus,
+              ...(newStatus === 'APPROVED' && { paidAt: new Date() }),
+            },
           })
+          
+          // SE APROVADO, ATIVAR ASSINATURA AUTOMATICAMENTE!
+          if (newStatus === 'APPROVED') {
+            console.log('✅ Payment APPROVED via polling! Activating subscription...')
+            try {
+              const activatedSub = await subscription.activateSubscription(payment.userId, payment.planDays)
+              console.log('🎉 Subscription activated via polling!', {
+                userId: payment.userId,
+                status: activatedSub.status,
+                endAt: activatedSub.endAt
+              })
+              return NextResponse.json({ 
+                payment: updated,
+                subscription: activatedSub,
+                message: 'Assinatura ativada com sucesso!'
+              })
+            } catch (subError) {
+              console.error('❌ Error activating subscription:', subError)
+            }
+          }
+          
           return NextResponse.json({ payment: updated })
         }
       } catch (err) {
         console.error('Error fetching MP status:', err)
+      }
+    }
+    
+    // Se já está APPROVED mas assinatura não está ativa, ativar agora!
+    if (payment.status === 'APPROVED') {
+      const userSub = await prisma.subscription.findUnique({
+        where: { userId: payment.userId }
+      })
+      
+      if (!userSub || userSub.status !== 'ACTIVE') {
+        console.log('🔧 Payment APPROVED but subscription not active. Fixing...')
+        try {
+          const activatedSub = await subscription.activateSubscription(payment.userId, payment.planDays)
+          console.log('🎉 Subscription fixed and activated!', {
+            userId: payment.userId,
+            status: activatedSub.status
+          })
+          return NextResponse.json({ 
+            payment,
+            subscription: activatedSub,
+            message: 'Assinatura ativada!'
+          })
+        } catch (subError) {
+          console.error('❌ Error fixing subscription:', subError)
+        }
       }
     }
     
