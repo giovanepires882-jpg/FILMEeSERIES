@@ -30,8 +30,8 @@ Plataforma de streaming completa com autenticação, pagamento PIX via Mercado P
 Configure as seguintes variáveis no arquivo `.env`:
 
 ```env
-# Database
-DATABASE_URL=postgresql://voduser:vodpass123@localhost:5432/vodstream?schema=public
+# Database (SQLite - para produ\u00e7\u00e3o use PostgreSQL)
+DATABASE_URL=file:./dev.db
 
 # App
 APP_BASE_URL=https://vodstream.preview.emergentagent.com
