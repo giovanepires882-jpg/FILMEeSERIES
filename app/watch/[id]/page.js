@@ -135,6 +135,7 @@ export default function WatchPage({ params }) {
 
     video.addEventListener('loadstart', () => {
       console.log('Video loading started')
+      setVideoLoading(true)
     })
 
     video.addEventListener('loadedmetadata', () => {
@@ -143,6 +144,16 @@ export default function WatchPage({ params }) {
 
     video.addEventListener('canplay', () => {
       console.log('Video can play')
+      setVideoLoading(false)
+    })
+
+    video.addEventListener('playing', () => {
+      setVideoLoading(false)
+      setPlaying(true)
+    })
+
+    video.addEventListener('waiting', () => {
+      setVideoLoading(true)
     })
 
     // Start progress tracking
