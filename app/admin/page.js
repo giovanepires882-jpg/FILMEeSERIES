@@ -340,6 +340,9 @@ export default function AdminPage() {
                 <p className="text-gray-500 text-sm ml-6">
                   Quando ativado, identifica padrões como "S01E02", "1x02", "Temporada 1 Ep 2" nos títulos
                 </p>
+                <p className="text-yellow-500 text-sm ml-6 mt-1">
+                  ⚠️ Para listas muito grandes (+100k itens), considere desativar para evitar timeout
+                </p>
                 
                 <Button
                   onClick={handleSyncWithUrl}
