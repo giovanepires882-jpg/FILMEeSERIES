@@ -1148,6 +1148,85 @@ async function handleAdminGetVods(req) {
   }
 }
 
+async function handleAdminActivateSubscription(req) {
+  try {
+    const user = await auth.requireAdmin(req)
+    const body = await req.json()
+    const { userId, days } = body
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'userId required' }, { status: 400 })
+    }
+    
+    const planDays = days || 30
+    const activatedSub = await subscription.activateSubscription(userId, planDays)
+    
+    return NextResponse.json({ 
+      success: true, 
+      subscription: activatedSub,
+      message: `Assinatura ativada por ${planDays} dias`
+    })
+  } catch (error) {
+    console.error('Admin activate subscription error:', error)
+    if (error.message === 'Unauthorized' || error.message === 'Forbidden: Admin only') {
+      return NextResponse.json({ error: error.message }, { status: 403 })
+    }
+    return NextResponse.json({ error: error.message || 'Failed to activate' }, { status: 500 })
+  }
+}
+
+async function handleAdminFixSubscriptions(req) {
+  try {
+    const user = await auth.requireAdmin(req)
+    
+    console.log('🔧 Fixing subscriptions...')
+    
+    // Buscar todos os pagamentos APROVADOS
+    const approvedPayments = await prisma.payment.findMany({
+      where: { status: 'APPROVED' },
+      include: { 
+        user: { 
+          include: { subscription: true } 
+        } 
+      }
+    })
+    
+    console.log(`📊 Found ${approvedPayments.length} approved payments`)
+    
+    let fixed = 0
+    let alreadyActive = 0
+    
+    for (const payment of approvedPayments) {
+      const sub = payment.user.subscription
+      
+      // Se a assinatura não está ativa, ativar
+      if (sub && sub.status !== 'ACTIVE') {
+        await subscription.activateSubscription(payment.userId, payment.planDays)
+        fixed++
+        console.log(`✅ Fixed: ${payment.user.email}`)
+      } else if (sub && sub.status === 'ACTIVE') {
+        alreadyActive++
+        console.log(`ℹ️  Already active: ${payment.user.email}`)
+      }
+    }
+    
+    console.log(`✨ Fixed ${fixed}, Already active ${alreadyActive}`)
+    
+    return NextResponse.json({ 
+      success: true,
+      fixed,
+      alreadyActive,
+      total: approvedPayments.length
+    })
+  } catch (error) {
+    console.error('Admin fix subscriptions error:', error)
+    if (error.message === 'Unauthorized' || error.message === 'Forbidden: Admin only') {
+      return NextResponse.json({ error: error.message }, { status: 403 })
+    }
+    return NextResponse.json({ error: 'Failed to fix subscriptions' }, { status: 500 })
+  }
+}
+
 // ============ ROUTER ============
 export async function GET(req, { params }) {
   const path = params.path?.join('/') || ''
