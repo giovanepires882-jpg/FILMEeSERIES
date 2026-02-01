@@ -320,6 +320,8 @@ export default function WatchPage({ params }) {
           controls={false}
           autoPlay
           playsInline
+          preload="auto"
+          crossOrigin="anonymous"
         />
 
         {/* Loading Spinner */}
