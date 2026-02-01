@@ -409,7 +409,32 @@ export default function AdminPage() {
         )}
 
         {activeTab === 'users' && (
-          <div className="bg-gray-900 rounded-lg p-6">
+          <div className="space-y-6">
+            <div className="bg-gray-900 rounded-lg p-6 border-2 border-yellow-900">
+              <h2 className="text-xl font-semibold text-yellow-500 mb-4">🔧 Corrigir Assinaturas</h2>
+              <p className="text-gray-300 mb-4">
+                Ativa automaticamente as assinaturas de todos os usuários que já pagaram (status APPROVED) mas ainda não foram ativados.
+              </p>
+              <Button
+                onClick={handleFixSubscriptions}
+                disabled={fixingSubscriptions}
+                className="bg-yellow-600 hover:bg-yellow-700"
+              >
+                {fixingSubscriptions ? (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                    Corrigindo...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Corrigir Assinaturas Agora
+                  </>
+                )}
+              </Button>
+            </div>
+
+            <div className="bg-gray-900 rounded-lg p-6">
             <h2 className="text-xl font-semibold text-white mb-4">Usuários ({users.length})</h2>
             {users.length === 0 ? (
               <p className="text-gray-400">Nenhum usuário cadastrado.</p>
