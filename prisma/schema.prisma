@@ -144,10 +144,10 @@ model VodItem {
   id          String    @id @default(uuid())
   externalId  String    @unique
   title       String
-  description String?   @db.Text
+  description String?
   posterUrl   String?
   categoryId  String
-  streamUrl   String    @db.Text
+  streamUrl   String
   isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
