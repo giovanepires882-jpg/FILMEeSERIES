@@ -104,7 +104,7 @@ model WebhookEvent {
   action      String
   eventKey    String   @unique
   receivedAt  DateTime @default(now())
-  rawJson     Json
+  rawJson     String
   processedAt DateTime?
   
   @@index([resourceId])
