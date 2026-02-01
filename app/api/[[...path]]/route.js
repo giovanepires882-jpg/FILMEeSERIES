@@ -1482,6 +1482,22 @@ export async function GET(req, { params }) {
     return handleGetVodById(vodId)
   }
   
+  // Search
+  if (path === 'search') return handleSearchVods(req)
+  
+  // Series
+  if (path === 'series') return handleGetSeries(req)
+  if (path.startsWith('series/') && path.split('/').length === 2) {
+    const seriesId = path.split('/')[1]
+    return handleGetSeriesById(seriesId)
+  }
+  
+  // Episode Stream
+  if (path.startsWith('episode/') && path.endsWith('/stream')) {
+    const episodeId = path.split('/')[1]
+    return handleGetEpisodeStream(req, episodeId)
+  }
+  
   // Stream
   if (path.startsWith('stream/') && path.split('/').length === 2) {
     const vodId = path.split('/')[1]
