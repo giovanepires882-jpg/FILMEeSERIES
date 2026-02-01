@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, CreditCard, LogOut } from 'lucide-react'
+import { ArrowLeft, CreditCard, LogOut, RefreshCw, CheckCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
@@ -15,10 +15,18 @@ export default function AccountPage() {
   const [subscription, setSubscription] = useState(null)
   const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(true)
+  const [checking, setChecking] = useState(false)
 
   useEffect(() => {
     loadData()
   }, [])
+
+  // Verificar pagamentos pendentes automaticamente
+  useEffect(() => {
+    if (payments.length > 0 && !subscription?.isActive) {
+      checkPendingPayments()
+    }
+  }, [payments])
 
   const loadData = async () => {
     try {
@@ -46,6 +54,33 @@ export default function AccountPage() {
     }
   }
 
+  // Verificar se há pagamentos aprovados que não ativaram a assinatura
+  const checkPendingPayments = async () => {
+    setChecking(true)
+    
+    try {
+      // Verificar cada pagamento APPROVED ou PENDING
+      for (const payment of payments) {
+        if (payment.status === 'APPROVED' || payment.status === 'PENDING') {
+          const res = await fetch(`/api/billing/status?mpPaymentId=${payment.mpPaymentId}`)
+          if (res.ok) {
+            const data = await res.json()
+            // Se ativou a assinatura, recarregar dados
+            if (data.subscription?.status === 'ACTIVE') {
+              toast.success('🎉 Assinatura ativada com sucesso!')
+              await loadData()
+              break
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error checking payments:', error)
+    } finally {
+      setChecking(false)
+    }
+  }
+
   const handleLogout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' })
@@ -53,6 +88,13 @@ export default function AccountPage() {
     } catch (error) {
       toast.error('Erro ao sair')
     }
+  }
+
+  const handleRefresh = async () => {
+    setChecking(true)
+    await checkPendingPayments()
+    await loadData()
+    setChecking(false)
   }
 
   if (loading) {
@@ -94,11 +136,25 @@ export default function AccountPage() {
         <div className="bg-gray-900 rounded-lg p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-2xl font-semibold text-white">Assinatura</h2>
-            {subscription?.isActive ? (
-              <span className="px-3 py-1 bg-green-600 text-white rounded text-sm">Ativa</span>
-            ) : (
-              <span className="px-3 py-1 bg-red-600 text-white rounded text-sm">Inativa</span>
-            )}
+            <div className="flex items-center gap-2">
+              {subscription?.isActive ? (
+                <span className="px-3 py-1 bg-green-600 text-white rounded text-sm flex items-center gap-1">
+                  <CheckCircle className="h-4 w-4" />
+                  Ativa
+                </span>
+              ) : (
+                <span className="px-3 py-1 bg-red-600 text-white rounded text-sm">Inativa</span>
+              )}
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleRefresh}
+                disabled={checking}
+                className="text-gray-400 hover:text-white"
+              >
+                <RefreshCw className={`h-4 w-4 ${checking ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
           </div>
           
           {subscription?.isActive ? (
@@ -114,6 +170,38 @@ export default function AccountPage() {
           ) : (
             <div>
               <p className="text-gray-300 mb-4">Sua assinatura está inativa. Ative agora para assistir a todo o conteúdo!</p>
+              
+              {/* Se tem pagamento pendente, mostrar aviso */}
+              {payments.some(p => p.status === 'PENDING') && (
+                <div className="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4 mb-4">
+                  <p className="text-yellow-200 text-sm">
+                    ⏳ Você tem um pagamento pendente. Assim que confirmado, sua assinatura será ativada automaticamente.
+                  </p>
+                </div>
+              )}
+              
+              {/* Se tem pagamento aprovado mas assinatura não ativa */}
+              {payments.some(p => p.status === 'APPROVED') && !subscription?.isActive && (
+                <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-4 mb-4">
+                  <p className="text-blue-200 text-sm mb-2">
+                    ✅ Pagamento aprovado detectado! Clique para verificar sua assinatura:
+                  </p>
+                  <Button 
+                    onClick={handleRefresh}
+                    disabled={checking}
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    {checking ? (
+                      <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                    )}
+                    Verificar Assinatura
+                  </Button>
+                </div>
+              )}
+              
               <Link href="/checkout/pix">
                 <Button className="bg-red-600 hover:bg-red-700">
                   <CreditCard className="mr-2 h-4 w-4" />
