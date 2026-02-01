@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, RefreshCw, Users, PlayCircle, Trash2, Upload } from 'lucide-react'
+import { ArrowLeft, RefreshCw, Users, PlayCircle, Trash2, Upload, Tv, Film } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Select,
   SelectContent,
@@ -30,6 +31,8 @@ export default function AdminPage() {
   const [m3uUrl, setM3uUrl] = useState('')
   const [deleteCategory, setDeleteCategory] = useState('')
   const [fixingSubscriptions, setFixingSubscriptions] = useState(false)
+  const [detectSeries, setDetectSeries] = useState(true)
+  const [lastSyncStats, setLastSyncStats] = useState(null)
 
   useEffect(() => {
     checkAuth()
