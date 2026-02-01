@@ -1267,103 +1267,133 @@ async function handleAdminSyncWithUrl(req) {
         const seriesExternalIds = new Set()
         const episodeExternalIds = new Set()
         
-        // Upsert movies
-        for (const movie of movies) {
-          movieExternalIds.add(movie.externalId)
-          
-          // Upsert category
-          const categorySlug = movie.category.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+        // Cache de categorias para evitar queries repetidas
+        const categoryCache = new Map()
+        
+        async function getOrCreateCategory(categoryName) {
+          const slug = categoryName.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+          if (categoryCache.has(slug)) {
+            return categoryCache.get(slug)
+          }
           const category = await prisma.category.upsert({
-            where: { slug: categorySlug },
-            update: { name: movie.category },
-            create: { name: movie.category, slug: categorySlug },
+            where: { slug },
+            update: { name: categoryName },
+            create: { name: categoryName, slug },
           })
-          
-          // Upsert VOD
-          await prisma.vodItem.upsert({
-            where: { externalId: movie.externalId },
-            update: {
-              title: movie.title,
-              posterUrl: movie.posterUrl,
-              categoryId: category.id,
-              streamUrl: movie.streamUrl,
-              isActive: true,
-            },
-            create: {
-              externalId: movie.externalId,
-              title: movie.title,
-              posterUrl: movie.posterUrl,
-              categoryId: category.id,
-              streamUrl: movie.streamUrl,
-              isActive: true,
-            },
-          })
-          
-          itemsUpserted++
+          categoryCache.set(slug, category)
+          return category
         }
         
-        // Upsert series and episodes
-        for (const s of series) {
-          seriesExternalIds.add(s.externalId)
+        // Process movies in batches
+        const BATCH_SIZE = 100
+        console.log(`📦 Processing ${movies.length} movies in batches of ${BATCH_SIZE}...`)
+        
+        for (let i = 0; i < movies.length; i += BATCH_SIZE) {
+          const batch = movies.slice(i, i + BATCH_SIZE)
           
-          // Upsert category
-          const categorySlug = s.category.toLowerCase().replace(/[^a-z0-9]+/g, '-')
-          const category = await prisma.category.upsert({
-            where: { slug: categorySlug },
-            update: { name: s.category },
-            create: { name: s.category, slug: categorySlug },
+          await prisma.$transaction(async (tx) => {
+            for (const movie of batch) {
+              movieExternalIds.add(movie.externalId)
+              const category = await getOrCreateCategory(movie.category)
+              
+              await tx.vodItem.upsert({
+                where: { externalId: movie.externalId },
+                update: {
+                  title: movie.title,
+                  posterUrl: movie.posterUrl,
+                  categoryId: category.id,
+                  streamUrl: movie.streamUrl,
+                  isActive: true,
+                },
+                create: {
+                  externalId: movie.externalId,
+                  title: movie.title,
+                  posterUrl: movie.posterUrl,
+                  categoryId: category.id,
+                  streamUrl: movie.streamUrl,
+                  isActive: true,
+                },
+              })
+              itemsUpserted++
+            }
           })
           
-          // Upsert Series
-          const dbSeries = await prisma.series.upsert({
-            where: { externalId: s.externalId },
-            update: {
-              title: s.title,
-              posterUrl: s.posterUrl,
-              categoryId: category.id,
-              isActive: true,
-            },
-            create: {
-              externalId: s.externalId,
-              title: s.title,
-              posterUrl: s.posterUrl,
-              categoryId: category.id,
-              isActive: true,
-            },
-          })
-          
-          seriesUpserted++
-          
-          // Upsert Episodes
-          for (const ep of s.episodes) {
-            episodeExternalIds.add(ep.externalId)
-            
-            await prisma.episode.upsert({
-              where: { externalId: ep.externalId },
-              update: {
-                seriesId: dbSeries.id,
-                title: ep.title,
-                seasonNumber: ep.seasonNumber,
-                episodeNumber: ep.episodeNumber,
-                streamUrl: ep.streamUrl,
-                isActive: true,
-              },
-              create: {
-                externalId: ep.externalId,
-                seriesId: dbSeries.id,
-                title: ep.title,
-                seasonNumber: ep.seasonNumber,
-                episodeNumber: ep.episodeNumber,
-                streamUrl: ep.streamUrl,
-                isActive: true,
-              },
-            })
-            
-            episodesUpserted++
+          if ((i + BATCH_SIZE) % 1000 === 0 || i + BATCH_SIZE >= movies.length) {
+            console.log(`   Movies: ${Math.min(i + BATCH_SIZE, movies.length)}/${movies.length}`)
           }
         }
         
-        // Inativar itens removidos
+        // Process series and episodes in batches
+        console.log(`📺 Processing ${series.length} series...`)
+        
+        for (let i = 0; i < series.length; i += BATCH_SIZE) {
+          const seriesBatch = series.slice(i, i + BATCH_SIZE)
+          
+          for (const s of seriesBatch) {
+            seriesExternalIds.add(s.externalId)
+            const category = await getOrCreateCategory(s.category)
+            
+            // Upsert Series
+            const dbSeries = await prisma.series.upsert({
+              where: { externalId: s.externalId },
+              update: {
+                title: s.title,
+                posterUrl: s.posterUrl,
+                categoryId: category.id,
+                isActive: true,
+              },
+              create: {
+                externalId: s.externalId,
+                title: s.title,
+                posterUrl: s.posterUrl,
+                categoryId: category.id,
+                isActive: true,
+              },
+            })
+            seriesUpserted++
+            
+            // Process episodes in smaller batches
+            for (let j = 0; j < s.episodes.length; j += BATCH_SIZE) {
+              const epBatch = s.episodes.slice(j, j + BATCH_SIZE)
+              
+              await prisma.$transaction(async (tx) => {
+                for (const ep of epBatch) {
+                  episodeExternalIds.add(ep.externalId)
+                  
+                  await tx.episode.upsert({
+                    where: { externalId: ep.externalId },
+                    update: {
+                      seriesId: dbSeries.id,
+                      title: ep.title,
+                      seasonNumber: ep.seasonNumber,
+                      episodeNumber: ep.episodeNumber,
+                      streamUrl: ep.streamUrl,
+                      isActive: true,
+                    },
+                    create: {
+                      externalId: ep.externalId,
+                      seriesId: dbSeries.id,
+                      title: ep.title,
+                      seasonNumber: ep.seasonNumber,
+                      episodeNumber: ep.episodeNumber,
+                      streamUrl: ep.streamUrl,
+                      isActive: true,
+                    },
+                  })
+                  episodesUpserted++
+                }
+              })
+            }
+          }
+          
+          if ((i + BATCH_SIZE) % 100 === 0 || i + BATCH_SIZE >= series.length) {
+            console.log(`   Series: ${Math.min(i + BATCH_SIZE, series.length)}/${series.length}, Episodes: ${episodesUpserted}`)
+          }
+        }
+        
+        // Inativar itens removidos (em batches)
+        console.log('🗑️ Inactivating removed items...')
+        
         const inactivatedMovies = await prisma.vodItem.updateMany({
           where: {
             externalId: { notIn: Array.from(movieExternalIds) },
@@ -1401,6 +1431,8 @@ async function handleAdminSyncWithUrl(req) {
           },
         })
         
+        console.log('✅ Sync completed!')
+        
         return NextResponse.json({ 
           success: true, 
           syncLog,
@@ -1420,39 +1452,54 @@ async function handleAdminSyncWithUrl(req) {
         let itemsInactivated = 0
         
         const externalIds = new Set()
+        const categoryCache = new Map()
         
-        for (const item of items) {
-          externalIds.add(item.externalId)
+        const BATCH_SIZE = 100
+        
+        for (let i = 0; i < items.length; i += BATCH_SIZE) {
+          const batch = items.slice(i, i + BATCH_SIZE)
           
-          const category = await prisma.category.upsert({
-            where: { slug: item.category.toLowerCase().replace(/[^a-z0-9]+/g, '-') },
-            update: { name: item.category },
-            create: {
-              name: item.category,
-              slug: item.category.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-            },
+          await prisma.$transaction(async (tx) => {
+            for (const item of batch) {
+              externalIds.add(item.externalId)
+              
+              const slug = item.category.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+              let category = categoryCache.get(slug)
+              if (!category) {
+                category = await tx.category.upsert({
+                  where: { slug },
+                  update: { name: item.category },
+                  create: { name: item.category, slug },
+                })
+                categoryCache.set(slug, category)
+              }
+              
+              await tx.vodItem.upsert({
+                where: { externalId: item.externalId },
+                update: {
+                  title: item.title,
+                  posterUrl: item.posterUrl,
+                  categoryId: category.id,
+                  streamUrl: item.streamUrl,
+                  isActive: true,
+                },
+                create: {
+                  externalId: item.externalId,
+                  title: item.title,
+                  posterUrl: item.posterUrl,
+                  categoryId: category.id,
+                  streamUrl: item.streamUrl,
+                  isActive: true,
+                },
+              })
+              
+              itemsUpserted++
+            }
           })
           
-          await prisma.vodItem.upsert({
-            where: { externalId: item.externalId },
-            update: {
-              title: item.title,
-              posterUrl: item.posterUrl,
-              categoryId: category.id,
-              streamUrl: item.streamUrl,
-              isActive: true,
-            },
-            create: {
-              externalId: item.externalId,
-              title: item.title,
-              posterUrl: item.posterUrl,
-              categoryId: category.id,
-              streamUrl: item.streamUrl,
-              isActive: true,
-            },
-          })
-          
-          itemsUpserted++
+          if ((i + BATCH_SIZE) % 1000 === 0) {
+            console.log(`   Progress: ${Math.min(i + BATCH_SIZE, items.length)}/${items.length}`)
+          }
         }
         
         const inactivated = await prisma.vodItem.updateMany({
