@@ -7,39 +7,12 @@ datasource db {
   url      = "file:./dev.db"
 }
 
-enum Role {
-  USER
-  ADMIN
-}
-
-enum SubscriptionStatus {
-  ACTIVE
-  INACTIVE
-  EXPIRED
-  SUSPENDED
-  CANCELLED
-}
-
-enum PaymentStatus {
-  PENDING
-  APPROVED
-  REJECTED
-  CANCELLED
-  REFUNDED
-  CHARGEBACK
-}
-
-enum SyncStatus {
-  SUCCESS
-  FAIL
-}
-
 model User {
   id              String         @id @default(uuid())
   name            String?
   email           String         @unique
   passwordHash    String
-  role            Role           @default(USER)
+  role            String         @default("USER")
   termsAcceptedAt DateTime?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
@@ -60,40 +33,34 @@ model Session {
   createdAt        DateTime  @default(now())
   
   user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@index([userId])
 }
 
 model Subscription {
-  id        String             @id @default(uuid())
-  userId    String             @unique
-  status    SubscriptionStatus @default(INACTIVE)
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  status    String   @default("INACTIVE")
   startAt   DateTime?
   endAt     DateTime?
-  updatedAt DateTime           @updatedAt
+  updatedAt DateTime @updatedAt
   
-  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Payment {
-  id            String        @id @default(uuid())
+  id            String   @id @default(uuid())
   userId        String
-  provider      String        @default("mercadopago")
-  mpPaymentId   String        @unique
+  provider      String   @default("mercadopago")
+  mpPaymentId   String   @unique
   amount        Float
   planDays      Int
-  status        PaymentStatus @default(PENDING)
+  status        String   @default("PENDING")
   qrCodeBase64  String?
   qrCodeText    String?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
   paidAt        DateTime?
   
-  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@index([userId])
-  @@index([mpPaymentId])
-  @@index([status])
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model WebhookEvent {
@@ -106,9 +73,6 @@ model WebhookEvent {
   receivedAt  DateTime @default(now())
   rawJson     String
   processedAt DateTime?
-  
-  @@index([resourceId])
-  @@index([eventKey])
 }
 
 model PlaylistSource {
@@ -119,12 +83,12 @@ model PlaylistSource {
 }
 
 model SyncLog {
-  id                 String     @id @default(uuid())
-  startedAt          DateTime   @default(now())
+  id                 String    @id @default(uuid())
+  startedAt          DateTime  @default(now())
   finishedAt         DateTime?
-  itemsUpserted      Int        @default(0)
-  itemsInactivated   Int        @default(0)
-  status             SyncStatus
+  itemsUpserted      Int       @default(0)
+  itemsInactivated   Int       @default(0)
+  status             String
   message            String?
 }
 
@@ -136,8 +100,6 @@ model Category {
   updatedAt DateTime  @updatedAt
   
   vods      VodItem[]
-  
-  @@index([slug])
 }
 
 model VodItem {
@@ -155,10 +117,6 @@ model VodItem {
   category    Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   progress    WatchProgress[]
   favorites   Favorite[]
-  
-  @@index([categoryId])
-  @@index([isActive])
-  @@index([externalId])
 }
 
 model WatchProgress {
@@ -173,8 +131,6 @@ model WatchProgress {
   vod              VodItem  @relation(fields: [vodId], references: [id], onDelete: Cascade)
   
   @@unique([userId, vodId])
-  @@index([userId])
-  @@index([vodId])
 }
 
 model Favorite {
@@ -187,6 +143,4 @@ model Favorite {
   vod       VodItem  @relation(fields: [vodId], references: [id], onDelete: Cascade)
   
   @@unique([userId, vodId])
-  @@index([userId])
-  @@index([vodId])
 }
