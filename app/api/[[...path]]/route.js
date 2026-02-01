@@ -228,7 +228,7 @@ async function handleGetVods(req) {
     const q = searchParams.get('q') || ''
     const category = searchParams.get('category') || ''
     const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '20')
+    const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 50) // Max 50
     
     const where = {
       isActive: true,
@@ -244,6 +244,9 @@ async function handleGetVods(req) {
         },
       }),
     }
+    
+    // Se tem busca, limitar a 100 resultados para velocidade
+    const maxResults = q ? 100 : undefined
     
     const [vods, total] = await Promise.all([
       prisma.vodItem.findMany({
@@ -263,9 +266,10 @@ async function handleGetVods(req) {
         },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
-        take: limit,
+        take: maxResults ? Math.min(limit, maxResults) : limit,
       }),
-      prisma.vodItem.count({ where }),
+      // Count otimizado - se busca, limitar
+      q ? Promise.resolve(Math.min(await prisma.vodItem.count({ where }), maxResults)) : prisma.vodItem.count({ where }),
     ])
     
     return NextResponse.json({
@@ -273,8 +277,8 @@ async function handleGetVods(req) {
       pagination: {
         page,
         limit,
-        total,
-        totalPages: Math.ceil(total / limit),
+        total: Math.min(total, maxResults || total),
+        totalPages: Math.ceil(Math.min(total, maxResults || total) / limit),
       },
     })
   } catch (error) {
