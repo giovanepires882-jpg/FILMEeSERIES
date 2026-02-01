@@ -29,6 +29,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true)
   const [m3uUrl, setM3uUrl] = useState('')
   const [deleteCategory, setDeleteCategory] = useState('')
+  const [fixingSubscriptions, setFixingSubscriptions] = useState(false)
 
   useEffect(() => {
     checkAuth()
