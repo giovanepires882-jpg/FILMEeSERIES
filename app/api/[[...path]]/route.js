@@ -6,7 +6,7 @@ import prisma from '@/lib/prisma'
 import * as auth from '@/lib/auth'
 import * as subscription from '@/lib/subscription'
 import * as mp from '@/lib/mercadopago'
-import { fetchAndParseM3U, fetchAndParseM3UWithClassification } from '@/lib/m3u-parser'
+import { fetchAndParseM3U, fetchAndParseM3UWithClassification, streamParseM3U } from '@/lib/m3u-parser'
 import { z } from 'zod'
 import crypto from 'crypto'
 
