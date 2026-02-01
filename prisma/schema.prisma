@@ -83,8 +83,8 @@ model Payment {
   amount        Float
   planDays      Int
   status        PaymentStatus @default(PENDING)
-  qrCodeBase64  String?       @db.Text
-  qrCodeText    String?       @db.Text
+  qrCodeBase64  String?
+  qrCodeText    String?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   paidAt        DateTime?
