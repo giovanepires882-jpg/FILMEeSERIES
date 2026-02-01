@@ -296,10 +296,11 @@ export default function WatchPage({ params }) {
 
         {/* Loading Spinner */}
         {videoLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+          <div className="absolute inset-0 flex items-center justify-center bg-black/70">
             <div className="flex flex-col items-center gap-4">
               <div className="w-16 h-16 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
               <span className="text-white text-lg">Carregando vídeo...</span>
+              <span className="text-gray-400 text-sm">Se demorar muito, pode ser formato incompatível</span>
             </div>
           </div>
         )}
