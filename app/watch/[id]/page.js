@@ -234,6 +234,9 @@ export default function WatchPage({ params }) {
           ref={videoRef}
           className="w-full h-full"
           onClick={togglePlay}
+          controls={false}
+          autoPlay
+          playsInline
         />
 
         {/* Controls */}
