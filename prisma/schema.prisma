@@ -100,6 +100,7 @@ model Category {
   updatedAt DateTime  @updatedAt
   
   vods      VodItem[]
+  series    Series[]
 }
 
 model VodItem {
