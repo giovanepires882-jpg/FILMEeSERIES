@@ -82,8 +82,16 @@ export default function WatchPage({ params }) {
 
     console.log('Initializing player with URL:', streamUrl)
 
-    // Verificar se é HLS ou MP4 direto
-    if (streamUrl.includes('.m3u8')) {
+    // Detectar formato do arquivo
+    const fileExtension = streamUrl.split('.').pop().split('?')[0].toLowerCase()
+    console.log('File extension:', fileExtension)
+
+    // Formatos suportados diretamente pelo HTML5
+    const nativeFormats = ['mp4', 'webm', 'ogg']
+    const hlsFormats = ['m3u8', 'm3u']
+    const containerFormats = ['mkv', 'avi', 'mov', 'flv', 'wmv']
+
+    if (hlsFormats.includes(fileExtension) || streamUrl.includes('.m3u8')) {
       // HLS stream
       console.log('Detected HLS stream')
       if (Hls.isSupported()) {
@@ -97,26 +105,54 @@ export default function WatchPage({ params }) {
         hls.attachMedia(video)
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
           console.log('HLS manifest parsed, ready to play')
+          video.play().catch(e => console.log('Autoplay prevented:', e))
         })
         hls.on(Hls.Events.ERROR, (event, data) => {
           console.error('HLS error:', data)
           if (data.fatal) {
-            toast.error('Erro ao carregar vídeo')
+            toast.error('Erro ao carregar vídeo HLS')
           }
         })
       } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
         // Native HLS support (Safari)
         console.log('Using native HLS support')
         video.src = streamUrl
+        video.play().catch(e => console.log('Autoplay prevented:', e))
       } else {
         console.error('HLS not supported')
         toast.error('Seu navegador não suporta este formato de vídeo')
       }
-    } else {
-      // MP4 direto ou outro formato
-      console.log('Direct video stream (MP4 or other)')
+    } else if (nativeFormats.includes(fileExtension)) {
+      // Formatos nativos (MP4, WebM, OGG)
+      console.log('Direct video stream (native format):', fileExtension)
       video.src = streamUrl
       video.load()
+      video.play().catch(e => console.log('Autoplay prevented:', e))
+    } else if (containerFormats.includes(fileExtension)) {
+      // Formatos container (MKV, AVI, etc)
+      // Tentar reproduzir diretamente, alguns navegadores suportam
+      console.log('Container format detected:', fileExtension, '- attempting direct playback')
+      video.src = streamUrl
+      video.load()
+      
+      // Se não carregar em 5s, mostrar erro
+      const timeout = setTimeout(() => {
+        if (video.readyState < 2) {
+          console.error('Format not supported by browser:', fileExtension)
+          toast.error(`Formato ${fileExtension.toUpperCase()} não suportado. Use MP4 ou M3U8.`)
+        }
+      }, 5000)
+      
+      video.addEventListener('loadedmetadata', () => {
+        clearTimeout(timeout)
+        video.play().catch(e => console.log('Autoplay prevented:', e))
+      }, { once: true })
+    } else {
+      // Formato desconhecido, tentar mesmo assim
+      console.log('Unknown format, attempting playback:', fileExtension)
+      video.src = streamUrl
+      video.load()
+      video.play().catch(e => console.log('Autoplay prevented:', e))
     }
 
     // Error handling
@@ -124,12 +160,19 @@ export default function WatchPage({ params }) {
       console.error('Video error:', e, video.error)
       if (video.error) {
         const errorMessages = {
-          1: 'Erro ao carregar vídeo: Operação abortada',
+          1: 'Carregamento abortado',
           2: 'Erro de rede ao carregar vídeo',
           3: 'Erro ao decodificar vídeo',
-          4: 'Formato de vídeo não suportado',
+          4: 'Formato não suportado pelo navegador',
         }
-        toast.error(errorMessages[video.error.code] || 'Erro ao reproduzir vídeo')
+        const msg = errorMessages[video.error.code] || 'Erro ao reproduzir'
+        toast.error(msg)
+        console.error('Error details:', {
+          code: video.error.code,
+          message: video.error.message,
+          url: streamUrl,
+          format: fileExtension
+        })
       }
     })
 
